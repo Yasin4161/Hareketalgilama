@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hareket Algılama Sistemi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .video-container {
+            position: relative;
+            margin: 20px auto;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 800px;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .controls {
+            margin: 30px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button.active {
+            background: linear-gradient(45deg, #00b894, #00a085);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .slider-container label {
+            font-weight: bold;
+            min-width: 100px;
+        }
+
+        input[type="range"] {
+            width: 150px;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.3);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ff6b6b;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .stat-card h3 {
+            color: #ff6b6b;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .permission-card {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .permission-card h2 {
+            color: #ff6b6b;
+            margin-bottom: 20px;
+        }
+
+        .permission-card p {
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .error {
+            background: rgba(255,0,0,0.2);
+            color: #ffcccc;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid rgba(255,0,0,0.3);
+        }
+
+        .success {
+            background: rgba(0,255,0,0.2);
+            color: #ccffcc;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid rgba(0,255,0,0.3);
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .slider-container {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .motion-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00b894;
+            transition: all 0.3s ease;
+            opacity: 0.3;
+        }
+
+        .motion-indicator.active {
+            opacity: 1;
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Hareket Algılama Sistemi</h1>
+        
+        <div id="app">
+            <!-- İçerik JavaScript ile doldurulacak -->
+        </div>
+        
+        <div class="motion-indicator" id="motionIndicator"></div>
+    </div>
+
+    <script>
+        class HareketAlgilama {
+            constructor() {
+                this.video = null;
+                this.canvas = null;
+                this.ctx = null;
+                this.stream = null;
+                this.isDetectionActive = false;
+                this.sensitivity = 50;
+                this.detectionCount = 0;
+                this.lastDetection = null;
+                this.motionAreas = [];
+                this.soundEnabled = true;
+                this.visualEnabled = true;
+                this.startTime = new Date();
+                this.animationFrameId = null;
+                this.previousImageData = null;
+                this.audioContext = null;
+                this.isPermissionGranted = false;
+                
+                this.init();
+            }
+
+            init() {
+                this.renderInitialUI();
+                this.setupAudioContext();
+            }
+
+            renderInitialUI() {
+                const app = document.getElementById('app');
+                app.innerHTML = `
+                    <div class="permission-card">
+                        <h2>📷 Kamera İzni Gerekli</h2>
+                        <p>Hareket algılama sistemi için kameranıza erişim izni vermeniz gerekmektedir.</p>
+                        <p><strong>Not:</strong> Bu uygulama HTTPS üzerinde çalışmalıdır. Yerel olarak test ediyorsanız localhost kullanın.</p>
+                        <button onclick="hareketAlgilama.startCamera()">Kamerayı Başlat</button>
+                        <div id="errorMessage"></div>
+                    </div>
+                `;
+            }
+
+            renderMainUI() {
+                const app = document.getElementById('app');
+                app.innerHTML = `
+                    <div class="video-container">
+                        <video id="video" autoplay playsinline muted></video>
+                        <canvas id="canvas"></canvas>
+                    </div>
+                    
+                    <div class="controls">
+                        <button id="toggleDetection" onclick="hareketAlgilama.toggleDetection()">
+                            Algılamayı Başlat
+                        </button>
+                        <button onclick="hareketAlgilama.stopCamera()">
+                            Kamerayı Durdur
+                        </button>
+                        
+                        <div class="slider-container">
+                            <label>Hassasiyet:</label>
+                            <input type="range" min="10" max="100" value="${this.sensitivity}" 
+                                   oninput="hareketAlgilama.setSensitivity(this.value)">
+                            <span id="sensitivityValue">${this.sensitivity}</span>
+                        </div>
+                        
+                        <button id="soundToggle" onclick="hareketAlgilama.toggleSound()" 
+                                class="${this.soundEnabled ? 'active' : ''}">
+                            🔊 Ses ${this.soundEnabled ? 'Açık' : 'Kapalı'}
+                        </button>
+                        
+                        <button id="visualToggle" onclick="hareketAlgilama.toggleVisual()" 
+                                class="${this.visualEnabled ? 'active' : ''}">
+                            👁️ Görsel ${this.visualEnabled ? 'Açık' : 'Kapalı'}
+                        </button>
+                    </div>
+                    
+                    <div class="stats">
+                        <div class="stat-card">
+                            <h3>Toplam Algılama</h3>
+                            <p id="detectionCount">${this.detectionCount}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Son Algılama</h3>
+                            <p id="lastDetection">${this.lastDetection ? this.formatTime(this.lastDetection) : 'Henüz yok'}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Çalışma Süresi</h3>
+                            <p id="uptime">${this.getUptime()}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Durum</h3>
+                            <p id="status">${this.isDetectionActive ? 'Aktif' : 'Beklemede'}</p>
+                        </div>
+                    </div>
+                `;
+
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.video.addEventListener('loadedmetadata', () => {
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+                });
+
+                this.startStatsUpdate();
+            }
+
+            async startCamera() {
+                try {
+                    const constraints = {
+                        video: {
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            facingMode: { ideal: 'environment' } // Arka kamera
+                        },
+                        audio: false
+                    };
+
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.isPermissionGranted = true;
+                    
+                    this.renderMainUI();
+                    
+                    this.video.srcObject = this.stream;
+                    
+                    this.showSuccess('Kamera başarıyla başlatıldı!');
+                    
+                } catch (error) {
+                    console.error('Kamera erişim hatası:', error);
+                    this.showError(`Kamera erişim hatası: ${error.message}`);
+                }
+            }
+
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                
+                this.stopDetection();
+                this.isPermissionGranted = false;
+                this.renderInitialUI();
+                this.showSuccess('Kamera durduruldu.');
+            }
+
+            toggleDetection() {
+                if (this.isDetectionActive) {
+                    this.stopDetection();
+                } else {
+                    this.startDetection();
+                }
+            }
+
+            startDetection() {
+                if (!this.video || !this.canvas) return;
+                
+                this.isDetectionActive = true;
+                this.previousImageData = null;
+                this.detectMotion();
+                
+                document.getElementById('toggleDetection').textContent = 'Algılamayı Durdur';
+                document.getElementById('toggleDetection').classList.add('active');
+                this.updateStatus();
+                this.showSuccess('Hareket algılama başlatıldı!');
+            }
+
+            stopDetection() {
+                this.isDetectionActive = false;
+                
+                if (this.animationFrameId) {
+                    cancelAnimationFrame(this.animationFrameId);
+                    this.animationFrameId = null;
+                }
+                
+                if (this.ctx) {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+                
+                const toggleBtn = document.getElementById('toggleDetection');
+                if (toggleBtn) {
+                    toggleBtn.textContent = 'Algılamayı Başlat';
+                    toggleBtn.classList.remove('active');
+                }
+                this.updateStatus();
+            }
+
+            detectMotion() {
+                if (!this.isDetectionActive || !this.video || !this.canvas) return;
+
+                this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+                const currentImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
+                if (this.previousImageData) {
+                    const motionDetected = this.compareFrames(this.previousImageData, currentImageData);
+                    
+                    if (motionDetected) {
+                        this.onMotionDetected();
+                    }
+                }
+
+                this.previousImageData = currentImageData;
+                this.animationFrameId = requestAnimationFrame(() => this.detectMotion());
+            }
+
+            compareFrames(prevData, currData) {
+                const threshold = (100 - this.sensitivity) * 2;
+                const pixelThreshold = 30;
+                let motionPixels = 0;
+                let motionAreas = [];
+
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                for (let i = 0; i < prevData.data.length; i += 4) {
+                    const prevR = prevData.data[i];
+                    const prevG = prevData.data[i + 1];
+                    const prevB = prevData.data[i + 2];
+
+                    const currR = currData.data[i];
+                    const currG = currData.data[i + 1];
+                    const currB = currData.data[i + 2];
+
+                    const diff = Math.abs(prevR - currR) + Math.abs(prevG - currG) + Math.abs(prevB - currB);
+
+                    if (diff > pixelThreshold) {
+                        motionPixels++;
+                        
+                        if (this.visualEnabled) {
+                            const pixelIndex = i / 4;
+                            const x = pixelIndex % this.canvas.width;
+                            const y = Math.floor(pixelIndex / this.canvas.width);
+                            
+                            this.ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                            this.ctx.fillRect(x, y, 1, 1);
+                        }
+                    }
+                }
+
+                if (this.visualEnabled && motionPixels > threshold) {
+                    this.drawMotionRectangles();
+                }
+
+                return motionPixels > threshold;
+            }
+
+            drawMotionRectangles() {
+                const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                const areas = this.findMotionAreas(imageData);
+                
+                areas.forEach(area => {
+                    this.ctx.strokeStyle = 'red';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.strokeRect(area.x, area.y, area.width, area.height);
+                });
+            }
+
+            findMotionAreas(imageData) {
+                // Basit bölge tespit algoritması
+                const areas = [];
+                const minSize = 50;
+                
+                for (let y = 0; y < this.canvas.height - minSize; y += minSize) {
+                    for (let x = 0; x < this.canvas.width - minSize; x += minSize) {
+                        let hasMotion = false;
+                        
+                        for (let dy = 0; dy < minSize && !hasMotion; dy++) {
+                            for (let dx = 0; dx < minSize && !hasMotion; dx++) {
+                                const pixelIndex = ((y + dy) * this.canvas.width + (x + dx)) * 4;
+                                if (imageData.data[pixelIndex] === 255) { // Kırmızı piksel
+                                    hasMotion = true;
+                                }
+                            }
+                        }
+                        
+                        if (hasMotion) {
+                            areas.push({ x, y, width: minSize, height: minSize });
+                        }
+                    }
+                }
+                
+                return areas;
+            }
+
+            onMotionDetected() {
+                this.detectionCount++;
+                this.lastDetection = new Date();
+                
+                if (this.soundEnabled) {
+                    this.playAlert();
+                }
+                
+                // Görsel gösterge
+                const indicator = document.getElementById('motionIndicator');
+                if (indicator) {
+                    indicator.classList.add('active');
+                    setTimeout(() => {
+                        indicator.classList.remove('active');
+                    }, 500);
+                }
+                
+                this.updateStats();
+            }
+
+            setupAudioContext() {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (error) {
+                    console.warn('Web Audio API desteklenmiyor:', error);
+                }
+            }
+
+            playAlert() {
+                if (!this.audioContext) return;
+                
+                try {
+                    // AudioContext'i kullanıcı etkileşimi sonrası aktifleştir
+                    if (this.audioContext.state === 'suspended') {
+                        this.audioContext.resume();
+                    }
+                    
+                    const oscillator = this.audioContext.createOscillator();
+                    const gainNode = this.audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(this.audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(1200, this.audioContext.currentTime + 0.1);
+                    
+                    gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.3);
+                    
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.3);
+                } catch (error) {
+                    console.warn('Ses çalma hatası:', error);
+                }
+            }
+
+            setSensitivity(value) {
+                this.sensitivity = parseInt(value);
+                const sensitivityValue = document.getElementById('sensitivityValue');
+                if (sensitivityValue) {
+                    sensitivityValue.textContent = this.sensitivity;
+                }
+            }
+
+            toggleSound() {
+                this.soundEnabled = !this.soundEnabled;
+                const button = document.getElementById('soundToggle');
+                if (button) {
+                    button.textContent = `🔊 Ses ${this.soundEnabled ? 'Açık' : 'Kapalı'}`;
+                    button.classList.toggle('active', this.soundEnabled);
+                }
+                
+                // Ses aktifleştirildiğinde AudioContext'i başlat
+                if (this.soundEnabled && this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+            }
+
+            toggleVisual() {
+                this.visualEnabled = !this.visualEnabled;
+                const button = document.getElementById('visualToggle');
+                if (button) {
+                    button.textContent = `👁️ Görsel ${this.visualEnabled ? 'Açık' : 'Kapalı'}`;
+                    button.classList.toggle('active', this.visualEnabled);
+                }
+                
+                if (!this.visualEnabled && this.ctx) {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
+            }
+
+            updateStats() {
+                const detectionCount = document.getElementById('detectionCount');
+                const lastDetection = document.getElementById('lastDetection');
+                
+                if (detectionCount) {
+                    detectionCount.textContent = this.detectionCount;
+                }
+                
+                if (lastDetection) {
+                    lastDetection.textContent = this.lastDetection ? this.formatTime(this.lastDetection) : 'Henüz yok';
+                }
+            }
+
+            updateStatus() {
+                const status = document.getElementById('status');
+                if (status) {
+                    status.textContent = this.isDetectionActive ? 'Aktif' : 'Beklemede';
+                }
+            }
+
+            startStatsUpdate() {
+                setInterval(() => {
+                    const uptime = document.getElementById('uptime');
+                    if (uptime) {
+                        uptime.textContent = this.getUptime();
+                    }
+                }, 1000);
+            }
+
+            getUptime() {
+                const now = new Date();
+                const diff = now - this.startTime;
+                const minutes = Math.floor(diff / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            formatTime(date) {
+                return date.toLocaleTimeString('tr-TR');
+            }
+
+            showError(message) {
+                const errorDiv = document.getElementById('errorMessage');
+                if (errorDiv) {
+                    errorDiv.innerHTML = `<div class="error">${message}</div>`;
+                    setTimeout(() => {
+                        errorDiv.innerHTML = '';
+                    }, 5000);
+                }
+            }
+
+            showSuccess(message) {
+                const errorDiv = document.getElementById('errorMessage');
+                if (errorDiv) {
+                    errorDiv.innerHTML = `<div class="success">${message}</div>`;
+                    setTimeout(() => {
+                        errorDiv.innerHTML = '';
+                    }, 3000);
+                }
+            }
+        }
+
+        // Uygulamayı başlat
+        const hareketAlgilama = new HareketAlgilama();
+
+        // Sayfa yüklendiğinde ve kullanıcı etkileşiminde AudioContext'i aktifleştir
+        document.addEventListener('click', () => {
+            if (hareketAlgilama.audioContext && hareketAlgilama.audioContext.state === 'suspended') {
+                hareketAlgilama.audioContext.resume();
+            }
+        }, { once: true });
+    </script>
+</body>
+</html>
